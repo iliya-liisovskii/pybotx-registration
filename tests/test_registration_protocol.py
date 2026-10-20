@@ -128,6 +128,26 @@ async def test_invalid_ciphertext_and_non_allowlisted_endpoint_are_not_persisted
 
 
 @pytest.mark.asyncio
+async def test_non_utf8_secret_is_rejected_before_persistence(
+    app: FastAPI, repository: InMemoryRegistrationRepository
+) -> None:
+    async with await _client(app) as client:
+        ciphertext = await _sealed_payload(client, b"\xff\xfe\xfd")
+        response = await client.post(
+            "/register",
+            json={
+                "bot_id": "bot-a",
+                "server_id": "cts-a",
+                "server_host": "https://cts.example.internal",
+                "encrypted_secret_key": ciphertext,
+            },
+        )
+
+    assert response.status_code == 400
+    assert await repository.get(AccountKey("cts-a", "bot-a")) is None
+
+
+@pytest.mark.asyncio
 async def test_public_key_and_registration_require_the_security_profile(
     service: RegistrationService,
 ) -> None:
